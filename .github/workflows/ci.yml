@@ -27,13 +27,8 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Setup Snyk
-        uses: snyk/actions/setup@master
-        with:
-          version: "1.1156.0"
-
-      - name: Snyk test
-        uses: snyk/actions/test@master
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
