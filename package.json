@@ -9,8 +9,7 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "test": "jest --runInBand",
-    "test:watch": "jest --watch",
-    "snyk:test": "snyk test"
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
     "ts-node": "10.9.1",
@@ -22,7 +21,6 @@
     "@types/supertest": "2.0.12",
     "eslint": "8.49.0",
     "@typescript-eslint/parser": "6.8.0",
-    "@typescript-eslint/eslint-plugin": "6.8.0",
-    "snyk": "1.1156.0"
+    "@typescript-eslint/eslint-plugin": "6.8.0"
   }
 }
