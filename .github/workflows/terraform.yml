@@ -1,0 +1,52 @@
+name: Terraform CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.7"
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init -input=false
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan -out=plan.tfplan -input=false
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform/plan.tfplan
+
+  apply:
+    needs: plan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.7"
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: infra/terraform
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -input=false infra/terraform/plan.tfplan

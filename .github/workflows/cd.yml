@@ -1,0 +1,93 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      promote_to:
+        description: "promote to environment (staging|production)"
+        required: true
+        default: "staging"
+
+env:
+  IMAGE_NAME: ${{ secrets.ACR_NAME }}.azurecr.io/devops-project-demo
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Push to ACR
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          az acr login --name ${{ secrets.ACR_NAME }}
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
+          docker push $IMAGE_NAME:$IMAGE_TAG
+          docker push $IMAGE_NAME:latest
+
+      - name: Set output image
+        id: meta
+        run: echo "image=$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  deploy-staging:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && github.event.inputs.promote_to == 'staging'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials (staging)
+        run: |
+          az aks get-credentials --resource-group ${{ secrets.AKS_STAGING_RG }} --name ${{ secrets.AKS_STAGING_NAME }} --overwrite-existing
+
+      - name: Deploy to staging
+        run: |
+          IMAGE=${{ needs.build-and-push.outputs.image }}
+          export IMAGE
+          sudo apt-get update && sudo apt-get install -y gettext-base
+          REPLICAS=1 envsubst < infra/k8s/deployment.yml | kubectl apply -f - || kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
+
+  promote-to-production:
+    needs: build-and-push
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.promote_to == 'production'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials (production)
+        run: |
+          az aks get-credentials --resource-group ${{ secrets.AKS_PROD_RG }} --name ${{ secrets.AKS_PROD_NAME }} --overwrite-existing
+
+      - name: Deploy to production
+        run: |
+          IMAGE=${{ needs.build-and-push.outputs.image }}
+          export IMAGE
+          sudo apt-get update && sudo apt-get install -y gettext-base
+          REPLICAS=2 envsubst < infra/k8s/deployment.yml | kubectl apply -f - || kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
