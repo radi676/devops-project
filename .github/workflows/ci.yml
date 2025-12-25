@@ -40,13 +40,13 @@ jobs:
       - name: TruffleHog Scan
         id: trufflehog
         uses: trufflesecurity/trufflehog@main
-        continue-on-error: true
+        #continue-on-error: true
         with:
           path: ./
-          base: "${{ github.event.repository.default_branch }}"
+          base: ""
           head: HEAD
           extra_args: --debug
 
-      - name: Scan Results Status
-        if: steps.trufflehog.outcome == 'failure'
-        run: exit 1
+      #- name: Scan Results Status
+      #  if: steps.trufflehog.outcome == 'failure'
+      #  run: exit 1
