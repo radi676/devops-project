@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: gcr.io/${{ secrets.GCP_PROJECT }}/devops-project-demo
+  IMAGE_NAME: gcr.io/${{ secrets.GCP_PROJECT_ID }}/devops-project-demo
 
 jobs:
   build-and-push:
@@ -75,7 +75,7 @@ jobs:
         with:
           cluster_name: ${{ secrets.GKE_STAGING_CLUSTER }}
           location: ${{ secrets.GKE_STAGING_LOCATION }}
-          project_id: ${{ secrets.GCP_PROJECT }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Deploy to cluster
         run: |
