@@ -95,6 +95,6 @@ jobs:
       - name: Deploy to cluster
         run: |
           IMAGE=${{ needs.build-and-push.outputs.image }}
-          export IMAGE
-          sudo apt-get update && sudo apt-get install -y gettext-base
-          REPLICAS=1 envsubst < infra/k8s/deployment.yml | kubectl apply -f - || kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
+          echo "Deploying image: $IMAGE"
+          kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
+          kubectl rollout status deployment/devops-deployment --namespace default
