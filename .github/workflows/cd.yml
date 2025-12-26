@@ -5,89 +5,81 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      promote_to:
-        description: "promote to environment (staging|production)"
-        required: true
-        default: "staging"
 
 env:
-  IMAGE_NAME: ${{ secrets.ACR_NAME }}.azurecr.io/devops-project-demo
+  IMAGE_NAME: gcr.io/${{ secrets.GCP_PROJECT }}/devops-project-demo
 
 jobs:
   build-and-push:
+    environment: main
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to Azure
-        uses: azure/login@v1
+      - name: Authenticate to GCP using Workload Identity Federation
+        uses: "google-github-actions/auth@v3"
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
-      - name: Build image
+      - name: Check image in registry
+        id: check-image
         run: |
           IMAGE_TAG=${{ github.sha }}
+          IMAGE=${{ env.IMAGE_NAME }}
+          if gcloud container images list-tags "$IMAGE" --filter="tags=$IMAGE_TAG" --format='get(tags)' --limit=1 | grep -q "$IMAGE_TAG"; then
+            echo "Image $IMAGE:$IMAGE_TAG already exists in registry"
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push image to GCR
+        if: steps.check-image.outputs.exists == 'false'
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          gcloud auth configure-docker --quiet
           docker build -t $IMAGE_NAME:$IMAGE_TAG .
-
-      - name: Push to ACR
-        run: |
-          IMAGE_TAG=${{ github.sha }}
-          az acr login --name ${{ secrets.ACR_NAME }}
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
           docker push $IMAGE_NAME:latest
 
       - name: Set output image
         id: meta
         run: echo "image=$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_OUTPUT
 
-  deploy-staging:
+  deploy:
+    environment: main
+    permissions:
+      contents: read
+      id-token: write
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && github.event.inputs.promote_to == 'staging'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Login to Azure
-        uses: azure/login@v1
+      - name: Authenticate to GCP using Workload Identity Federation
+        uses: "google-github-actions/auth@v3"
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
-      - name: Get AKS credentials (staging)
-        run: |
-          az aks get-credentials --resource-group ${{ secrets.AKS_STAGING_RG }} --name ${{ secrets.AKS_STAGING_NAME }} --overwrite-existing
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: ${{ secrets.GKE_STAGING_CLUSTER }}
+          location: ${{ secrets.GKE_STAGING_LOCATION }}
+          project_id: ${{ secrets.GCP_PROJECT }}
 
-      - name: Deploy to staging
+      - name: Deploy to cluster
         run: |
           IMAGE=${{ needs.build-and-push.outputs.image }}
           export IMAGE
           sudo apt-get update && sudo apt-get install -y gettext-base
           REPLICAS=1 envsubst < infra/k8s/deployment.yml | kubectl apply -f - || kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
-
-  promote-to-production:
-    needs: build-and-push
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.promote_to == 'production'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Login to Azure
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Get AKS credentials (production)
-        run: |
-          az aks get-credentials --resource-group ${{ secrets.AKS_PROD_RG }} --name ${{ secrets.AKS_PROD_NAME }} --overwrite-existing
-
-      - name: Deploy to production
-        run: |
-          IMAGE=${{ needs.build-and-push.outputs.image }}
-          export IMAGE
-          sudo apt-get update && sudo apt-get install -y gettext-base
-          REPLICAS=2 envsubst < infra/k8s/deployment.yml | kubectl apply -f - || kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default

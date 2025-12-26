@@ -1,7 +1,11 @@
-output "aks_name" {
-  value = azurerm_kubernetes_cluster.aks.name
+output "artifact_repository" {
+  value = google_artifact_registry_repository.repo.repository_id
 }
 
-output "resource_group" {
-  value = azurerm_resource_group.aks.name
+output "cluster_name" {
+  value = google_container_cluster.primary.name
+}
+
+output "cluster_endpoint" {
+  value = google_container_cluster.primary.endpoint
 }
