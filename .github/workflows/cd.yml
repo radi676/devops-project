@@ -88,8 +88,8 @@ jobs:
       - name: Get GKE credentials
         uses: google-github-actions/get-gke-credentials@v1
         with:
-          cluster_name: ${{ secrets.GKE_STAGING_CLUSTER }}
-          location: ${{ secrets.GKE_STAGING_LOCATION }}
+          cluster_name: "autopilot-cluster-1"
+          location: "us-central1"
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Deploy to cluster
