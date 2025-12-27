@@ -34,3 +34,12 @@ resource "google_container_cluster" "primary" {
 
   remove_default_node_pool = false
 }
+
+resource "google_artifact_registry_repository_iam_member" "all_users_reader" {
+  provider   = google
+  project    = var.project
+  location   = google_artifact_registry_repository.repo.location
+  repository = google_artifact_registry_repository.repo.repository_id
+  role       = "roles/artifactregistry.reader"
+  member     = "allUsers"
+}

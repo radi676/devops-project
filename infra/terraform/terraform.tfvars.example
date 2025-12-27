@@ -1,7 +1,7 @@
 # Example values for terraform.tfvars
 project = "my-gcp-project"
-region  = "us-central1"
-zone    = "us-central1-a"
+region  = "europe-west1"
+zone    = "europe-west1-b"
 cluster_name = "my-gke-cluster"
 machine_type = "e2-medium"
 artifact_repo_id = "devops-repo"
