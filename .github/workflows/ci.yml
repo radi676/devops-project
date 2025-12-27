@@ -8,6 +8,13 @@ on:
 jobs:
   test-and-scan:
     runs-on: ubuntu-latest
+
+    outputs:
+      lint: ${{ steps.lint.outcome }}
+      snyk: ${{ steps.snyk.outcome }}
+      trufflehog: ${{ steps.trufflehog.outcome }}
+      test: ${{ steps.test.outcome }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,10 +30,12 @@ jobs:
         run: npm ci
 
       - name: Lint
+        id: lint
         run: npm run lint
         continue-on-error: true
 
       - name: Run Snyk check for vulnerabilities
+        id: snyk
         uses: snyk/actions/node@master
         continue-on-error: true
         env:
@@ -42,34 +51,29 @@ jobs:
           path: ./
           base: ""
           head: HEAD
-          extra_args: --debug
-
-      #- name: SonarQube Scan
-      #  continue-on-error: true
-      #  uses: SonarSource/sonarqube-scan-action@v7.0.0
-      #  with:
-      #    projectBaseDir: app/src
-      #    args: >
-      #      -Dsonar.organization=my-organization
-      #      "-Dsonar.projectName=My Project"
-      #      -Dsonar.projectKey=my-projectkey
-      #      -Dsonar.sources=src/
-      #      -Dsonar.tests=tests/
-      #      -Dsonar.verbose=true
-
-      - name: Trivy Scan
-        id: trivy
-        uses: radi676/devops-project/.github/workflows/trivy-scan.yml
-        continue-on-error: true
-        with:
-          image: devops-app:${{ github.sha }}
 
       - name: Run tests
-        continue-on-error: true
+        id: test
         run: npm test
+        continue-on-error: true
+  trivy-scan:
+    uses: radi676/devops-project/.github/workflows/trivy-scan.yml
+    continue-on-error: true
+    with:
+      image: devops-app:${{ github.sha }}
+  final-status:
+    runs-on: ubuntu-latest
+    needs: [test-and-scan, trivy-scan]
 
-      - name: Fail if any step failed
-        if: ${{ steps.lint.outcome == 'failure' || steps.snyk.outcome == 'failure' || steps.trufflehog.outcome == 'failure' || steps.test.outcome == 'failure' || steps.trivy.outcome == 'failure' }}
+    if: |
+      needs.test-and-scan.outputs.lint == 'failure' ||
+      needs.test-and-scan.outputs.snyk == 'failure' ||
+      needs.test-and-scan.outputs.trufflehog == 'failure' ||
+      needs.test-and-scan.outputs.test == 'failure' ||
+      needs.trivy-scan.result == 'failure'
+
+    steps:
+      - name: Fail workflow if any check failed
         run: |
           echo "One or more checks failed. Failing the workflow."
           exit 1
