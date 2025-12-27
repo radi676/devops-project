@@ -37,13 +37,6 @@ jobs:
         run: |
           gcloud auth configure-docker --quiet ${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
 
-      - name: "Docker Auth"
-        uses: "docker/login-action@v3"
-        with:
-          username: "oauth2accesstoken"
-          password: "${{ steps.gcpauth.outputs.access_token }}"
-          registry: "${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev"
-
       - name: Check image in registry
         id: check-image
         run: |
@@ -56,6 +49,13 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: "Docker Auth"
+        uses: "docker/login-action@v3"
+        with:
+          username: "oauth2accesstoken"
+          password: "${{ steps.gcpauth.outputs.access_token }}"
+          registry: "${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev"
+
       - name: Build and push image to GCR
         if: steps.check-image.outputs.exists == 'false'
         run: |
@@ -64,6 +64,13 @@ jobs:
           docker push $IMAGE_NAME:$IMAGE_TAG
           docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
           docker push $IMAGE_NAME:latest
+
+      - name: Trivy Scan
+        if: steps.check-image.outputs.exists == 'false'
+        uses: ./.github/workflows/trivy-scan.yml
+        with:
+          image: $IMAGE_NAME:${{ github.sha }}
+          build: false
 
       - name: Set output image
         id: meta
@@ -75,7 +82,7 @@ jobs:
       contents: read
       id-token: write
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -97,8 +104,29 @@ jobs:
 
       - name: Deploy to cluster
         run: |
-          IMAGE=${{ needs.build-and-push.outputs.image }}
-          export IMAGE
-          sudo apt-get update && sudo apt-get install -y gettext-base
-          REPLICAS=1 envsubst < infra/k8s/deployment.yml | kubectl apply -f -
-        # kubectl set image deployment/devops-deployment devops-container=$IMAGE --namespace default
+          export IMAGE=${{ needs.build-and-push.outputs.image }}
+          export REPLICAS=1
+          envsubst < infra/k8s/deployment.yml | kubectl apply -f -
+
+      - name: Resolve Public IP
+        run: |
+          svc=devops-service
+          ns=default
+          echo "Waiting for external IP or hostname for service $svc..."
+          for i in {1..6}; do
+            ip=$(kubectl get svc $svc -n $ns -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [ -n "$ip" ]; then
+              echo "Service $svc external IP: $ip"
+              exit 0
+            fi
+            host=$(kubectl get svc $svc -n $ns -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            if [ -n "$host" ]; then
+              echo "Service $svc external hostname: $host"
+              exit 0
+            fi
+            echo "Attempt $i: external endpoint not yet assigned. Waiting..."
+            sleep 5
+          done
+          echo "Timed out waiting for LoadBalancer IP/hostname for service $svc"
+          kubectl get svc $svc -n $ns -o wide
+          exit 1

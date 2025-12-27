@@ -1,0 +1,30 @@
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      build:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        if: ${{ inputs.build }}
+        run: docker build -t ${{ inputs.image }} .
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v1
+        with:
+          image-ref: ${{ inputs.image }}
+          format: "table"
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
