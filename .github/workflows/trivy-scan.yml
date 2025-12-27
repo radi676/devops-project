@@ -24,8 +24,9 @@ jobs:
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ inputs.image }}
-          format: "table"
+          format: "github"
           exit-code: "1"
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
+          scan-type: "image"
