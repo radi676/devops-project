@@ -8,6 +8,13 @@ on:
 jobs:
   test-and-scan:
     runs-on: ubuntu-latest
+
+    outputs:
+      lint: ${{ steps.lint.outcome }}
+      snyk: ${{ steps.snyk.outcome }}
+      trufflehog: ${{ steps.trufflehog.outcome }}
+      test: ${{ steps.test.outcome }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,10 +30,12 @@ jobs:
         run: npm ci
 
       - name: Lint
+        id: lint
         run: npm run lint
         continue-on-error: true
 
       - name: Run Snyk check for vulnerabilities
+        id: snyk
         uses: snyk/actions/node@master
         continue-on-error: true
         env:
@@ -42,34 +51,27 @@ jobs:
           path: ./
           base: ""
           head: HEAD
-          extra_args: --debug
-
-      #- name: SonarQube Scan
-      #  continue-on-error: true
-      #  uses: SonarSource/sonarqube-scan-action@v7.0.0
-      #  with:
-      #    projectBaseDir: app/src
-      #    args: >
-      #      -Dsonar.organization=my-organization
-      #      "-Dsonar.projectName=My Project"
-      #      -Dsonar.projectKey=my-projectkey
-      #      -Dsonar.sources=src/
-      #      -Dsonar.tests=tests/
-      #      -Dsonar.verbose=true
-
-      - name: Trivy Scan
-        id: trivy
-        uses: ./.github/workflows/trivy-scan.yml
-        continue-on-error: true
-        with:
-          image: devops-app:${{ github.sha }}
 
       - name: Run tests
-        continue-on-error: true
+        id: test
         run: npm test
+        continue-on-error: true
 
-      - name: Fail if any step failed
-        if: ${{ steps.lint.outcome == 'failure' || steps.snyk.outcome == 'failure' || steps.trufflehog.outcome == 'failure' || steps.test.outcome == 'failure' || steps.trivy.outcome == 'failure' }}
+      - name: Analyze results
         run: |
-          echo "One or more checks failed. Failing the workflow."
-          exit 1
+          echo "Lint result: ${{ steps.lint.outcome }}"
+          echo "Snyk result: ${{ steps.snyk.outcome }}"
+          echo "TruffleHog result: ${{ steps.trufflehog.outcome }}"
+          echo "Test result: ${{ steps.test.outcome }}"
+          if [[ "${{ steps.lint.outcome }}" == "failure" || "${{ steps.snyk.outcome }}" == "failure" || "${{ steps.trufflehog.outcome }}" == "failure" || "${{ steps.test.outcome }}" == "failure" ]]; then
+            echo "One or more checks failed."
+            exit 1
+          else
+            echo "All checks passed."
+          fi
+
+  trivy-scan:
+    uses: ./.github/workflows/trivy-scan.yml
+    with:
+      image: devops-app:${{ github.sha }}
+      build: true

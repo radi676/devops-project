@@ -2,11 +2,9 @@ name: CD
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
   workflow_dispatch:
-    branches:
-      - main
+    branches: ["main"]
 
 env:
   IMAGE_NAME: ${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_NAME }}/${{ vars.IMAGE_NAME }}

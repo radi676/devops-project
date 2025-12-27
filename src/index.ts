@@ -1,4 +1,3 @@
-
 import http from 'http'
 
 const PORT = (typeof process.env.PORT === 'string' && process.env.PORT.trim() !== '')
