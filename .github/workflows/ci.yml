@@ -58,7 +58,7 @@ jobs:
         continue-on-error: true
 
   trivy-scan:
-    uses: radi676/devops-project/.github/workflows/trivy-scan.yml
+    uses: ./.github/workflows/trivy-scan.yml
     with:
       image: devops-app:${{ github.sha }}
 
