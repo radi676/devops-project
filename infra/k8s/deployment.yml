@@ -4,15 +4,18 @@ metadata:
   name: devops-deployment
   labels:
     app: devops-app
+    app.kubernetes.io/managed-by: cloud-console
 spec:
   replicas: ${REPLICAS}
   selector:
     matchLabels:
       app: devops-app
+      app.kubernetes.io/managed-by: cloud-console
   template:
     metadata:
       labels:
         app: devops-app
+        app.kubernetes.io/managed-by: cloud-console
     spec:
       containers:
         - name: devops-container

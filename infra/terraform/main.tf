@@ -34,11 +34,3 @@ resource "google_container_cluster" "primary" {
 
   remove_default_node_pool = false
 }
-
-output "cluster_name" {
-  value = google_container_cluster.primary.name
-}
-
-output "cluster_endpoint" {
-  value = google_container_cluster.primary.endpoint
-}

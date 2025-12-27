@@ -4,12 +4,12 @@ variable "project" {
 
 variable "region" {
   type = string
-  default = "us-central1"
+  default = "europe-west3"
 }
 
 variable "zone" {
   type = string
-  default = "us-central1-a"
+  default = "europe-west3-a"
 }
 
 variable "cluster_name" {
@@ -25,9 +25,4 @@ variable "machine_type" {
 variable "artifact_repo_id" {
   type = string
   default = "devops-repo"
-}
-
-variable "tf_state_bucket" {
-  type = string
-  description = "GCS bucket name for Terraform remote state"
 }
