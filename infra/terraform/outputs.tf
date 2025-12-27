@@ -11,7 +11,7 @@ output "cluster_name" {
 }
 
 output "cluster_location" {
-  value = google_container_cluster.primary.location
+  value = google_container_cluster.primary.zone
 }
 
 output "cluster_endpoint" {
