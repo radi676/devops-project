@@ -59,7 +59,7 @@ jobs:
 
       - name: Trivy Scan
         id: trivy
-        uses: .github/workflows/trivy-scan.yml
+        uses: radi676/devops-project/.github/workflows/trivy-scan.yml
         continue-on-error: true
         with:
           image: devops-app:${{ github.sha }}

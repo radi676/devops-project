@@ -67,7 +67,7 @@ jobs:
 
       - name: Trivy Scan
         if: steps.check-image.outputs.exists == 'false'
-        uses: .github/workflows/trivy-scan.yml
+        uses: radi676/devops-project/.github/workflows/trivy-scan.yml
         with:
           image: $IMAGE_NAME:${{ github.sha }}
           build: false
