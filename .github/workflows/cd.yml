@@ -22,18 +22,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Resolve image versions
-        id: pkg
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "Resolved version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Resolve image name
         id: image
         run: |
           IMAGE_NAME="${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_NAME }}/${{ vars.IMAGE_NAME }}"
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Resolve image version
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Resolved version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Authenticate to GCP
         id: gcpauth
@@ -68,7 +68,7 @@ jobs:
       - name: Build and push image to GCR
         if: steps.check-image.outputs.build == 'true'
         run: |
-          IMAGE_TAG=${{ steps.pkg.outputs.version }}
+          IMAGE_TAG=${{ github.sha }}
           IMAGE=${{ steps.image.outputs.image_name }}
 
           docker build -t $IMAGE:$IMAGE_TAG .
