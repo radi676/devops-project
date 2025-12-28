@@ -123,6 +123,7 @@ jobs:
           IMAGE_TAG=${{ needs.build-and-push.outputs.version }}
           IMAGE_SHA=${{ github.sha }}
 
+          docker pull $IMAGE_NAME:$IMAGE_SHA
           docker tag $IMAGE_NAME:$IMAGE_SHA $IMAGE_NAME:$IMAGE_TAG
           docker tag $IMAGE_NAME:$IMAGE_SHA $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
