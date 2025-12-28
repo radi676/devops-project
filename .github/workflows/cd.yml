@@ -18,11 +18,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      build: ${{ steps.check-image.outputs.build }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to GCP using Workload Identity Federation
+      - name: Resolve image versions
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Resolved version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Authenticate to GCP
         id: gcpauth
         uses: "google-github-actions/auth@v3"
         with:
@@ -38,14 +46,55 @@ jobs:
       - name: Check image in registry
         id: check-image
         run: |
-          IMAGE_TAG=${{ github.sha }}
+          IMAGE_TAG=${{ steps.pkg.outputs.version }}
           IMAGE=${{ env.IMAGE_NAME }}
           if gcloud container images list-tags "$IMAGE" --filter="tags=$IMAGE_TAG" --format='get(tags)' --limit=1 | grep -q "$IMAGE_TAG"; then
-            echo "Image $IMAGE:$IMAGE_TAG already exists in registry"
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Image $IMAGE:$IMAGE_TAG already exists in registry. Skipping build and push."
+            echo "build=false" >> $GITHUB_OUTPUT
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Image $IMAGE:$IMAGE_TAG does not exist in registry. Will build and push."
+            echo "build=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Build and push image to GCR
+        if: steps.check-image.outputs.build == 'true'
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Set output image
+        id: meta
+        run: echo "image=$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  trivy-scan:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: needs.build-and-push.outputs.build == 'true'
+    steps:
+      - name: Trivy Scan
+        uses: ./.github/workflows/trivy-scan.yml
+        with:
+          image: $IMAGE_NAME:${{ github.sha }}
+          build: false
+
+  publish-image:
+    needs: [build-and-push, trivy-scan]
+    runs-on: ubuntu-latest
+    if: needs.build-and-push.outputs.build == 'true'
+    steps:
+      - name: Authenticate to GCP
+        id: gcpauth
+        uses: "google-github-actions/auth@v3"
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+          token_format: "access_token"
+
+      - name: GCR configuration
+        run: |
+          gcloud auth configure-docker --quiet ${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev
 
       - name: "Docker Auth"
         uses: "docker/login-action@v3"
@@ -54,39 +103,26 @@ jobs:
           password: "${{ steps.gcpauth.outputs.access_token }}"
           registry: "${{ vars.GCP_ARTIFACT_REGISTRY_LOCATION }}-docker.pkg.dev"
 
-      - name: Build and push image to GCR
-        if: steps.check-image.outputs.exists == 'false'
+      - name: "Publish Image"
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+          IMAGE_TAG=${{ jobs.build-and-push.outputs.version }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$IMAGE_TAG
+          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
-          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:latest
-          docker push $IMAGE_NAME:latest
-
-      - name: Trivy Scan
-        if: steps.check-image.outputs.exists == 'false'
-        uses: ./.github/workflows/trivy-scan.yml
-        with:
-          image: $IMAGE_NAME:${{ github.sha }}
-          build: false
-
-      - name: Set output image
-        id: meta
-        run: echo "image=$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_OUTPUT
 
   deploy:
     environment: main
     permissions:
       contents: read
       id-token: write
-    needs: build-and-push
+    needs: ["publish-image"]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to GCP using Workload Identity Federation
+      - name: Authenticate to GCP
         uses: "google-github-actions/auth@v3"
         with:
           project_id: ${{ vars.GCP_PROJECT_ID }}
@@ -104,27 +140,31 @@ jobs:
         run: |
           export IMAGE=${{ needs.build-and-push.outputs.image }}
           export REPLICAS=1
+          export DEPLOYMENT=devops-deployment
+          export APP=devops-app
+          export NAMESPACE=default
+          export SERVICE=devops-service
+          export CONTAINER=devops-container
           envsubst < infra/k8s/deployment.yml | kubectl apply -f -
+          kubectl rollout status deployment/${DEPLOYMENT} --namespace ${NAMESPACE}
 
       - name: Resolve Public IP
         run: |
-          svc=devops-service
-          ns=default
-          echo "Waiting for external IP or hostname for service $svc..."
+          echo "Waiting for external IP or hostname for service ${SERVICE}..."
           for i in {1..6}; do
-            ip=$(kubectl get svc $svc -n $ns -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            ip=$(kubectl get svc ${SERVICE} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
             if [ -n "$ip" ]; then
-              echo "Service $svc external IP: $ip"
+              echo "Service ${SERVICE} external IP: $ip"
               exit 0
             fi
-            host=$(kubectl get svc $svc -n $ns -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+            host=$(kubectl get svc ${SERVICE} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
             if [ -n "$host" ]; then
-              echo "Service $svc external hostname: $host"
+              echo "Service ${SERVICE} external hostname: $host"
               exit 0
             fi
             echo "Attempt $i: external endpoint not yet assigned. Waiting..."
             sleep 5
           done
           echo "Timed out waiting for LoadBalancer IP/hostname for service $svc"
-          kubectl get svc $svc -n $ns -o wide
+          kubectl get svc ${SERVICE} -n ${NAMESPACE} -o wide
           exit 1

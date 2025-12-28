@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: devops-deployment
+  name: ${DEPLOYMENT}
   labels:
-    app: devops-app
+    app: ${APP}
     app.kubernetes.io/managed-by: cloud-console
 spec:
   replicas: ${REPLICAS}
   selector:
     matchLabels:
-      app: devops-app
+      app: ${APP}
       app.kubernetes.io/managed-by: cloud-console
   template:
     metadata:
       labels:
-        app: devops-app
+        app: ${APP}
         app.kubernetes.io/managed-by: cloud-console
     spec:
       containers:
-        - name: devops-container
+        - name: ${CONTAINER}
           image: ${IMAGE}
           ports:
             - containerPort: 3000
@@ -27,10 +27,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: devops-service
+  name: ${SERVICE}
 spec:
   selector:
-    app: devops-app
+    app: ${APP}
   ports:
     - protocol: TCP
       port: 80
