@@ -3,6 +3,12 @@ name: CD
 on:
   push:
     branches: ["main"]
+    paths:
+      - "src/**"
+      - "Dockerfile"
+      - "package.json"
+      - "infra/k8s/**"
+      - ".github/workflows/**"
   workflow_dispatch:
     branches: ["main"]
 
