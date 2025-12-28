@@ -105,7 +105,7 @@ jobs:
 
       - name: "Publish Image"
         run: |
-          IMAGE_TAG=${{ jobs.build-and-push.outputs.version }}
+          IMAGE_TAG=${{ needs.build-and-push.outputs.version }}
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$IMAGE_TAG
           docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
