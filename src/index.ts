@@ -12,7 +12,8 @@ const server = http.createServer((req, res) => {
 						env: (typeof process.env.NODE_ENV === 'string' && process.env.NODE_ENV.trim() !== '')
 							? process.env.NODE_ENV
 							: 'development',
-			time: new Date().toISOString()
+			time: new Date().toISOString(),
+			utc_time: new Date().toUTCString(),
 		})
 	)
 })
