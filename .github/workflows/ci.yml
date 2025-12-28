@@ -100,7 +100,6 @@ jobs:
 
   trivy-scan:
     name: Trivy Scan
-    needs: test-and-scan
     uses: ./.github/workflows/trivy-scan.yml
     with:
       image: devops-app:${{ github.sha }}
