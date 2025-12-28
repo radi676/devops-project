@@ -55,6 +55,16 @@ jobs:
         id: version-check
         continue-on-error: true
         run: |
+          CHANGED=$(git diff --name-only origin/main HEAD -- "src/**" "Dockerfile" "package.json")
+
+          if [ -z "$CHANGED" ]; then
+            echo "No relevant changes detected. Skipping version check."
+            exit 0
+          fi
+
+          echo "Relevant changes detected in:"
+          echo "$CHANGED"
+
           PR_VERSION=$(jq -r '.version' package.json)
           echo "PR_VERSION=$VERSION"
 
