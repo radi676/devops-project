@@ -21,17 +21,18 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
       - name: Lint
         id: lint
+        if: always() && steps.install.outcome == 'success'
         run: npm run lint
-        continue-on-error: true
 
       - name: Run Snyk check for vulnerabilities
         id: snyk
+        if: always() && steps.install.outcome == 'success'
         uses: snyk/actions/node@master
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -39,8 +40,8 @@ jobs:
 
       - name: Run TruffleHog scan for secrets
         id: trufflehog
+        if: always() && steps.install.outcome == 'success'
         uses: trufflesecurity/trufflehog@main
-        continue-on-error: true
         with:
           path: ./
           base: ""
@@ -48,12 +49,12 @@ jobs:
 
       - name: Run tests
         id: test
+        if: always() && steps.install.outcome == 'success'
         run: npm test
-        continue-on-error: true
 
       - name: Check version
         id: version-check
-        continue-on-error: true
+        if: always() && steps.install.outcome == 'success'
         run: |
           CHANGED=$(git diff --name-only origin/main HEAD -- "src/**" "Dockerfile" "package.json")
 
@@ -92,11 +93,13 @@ jobs:
           echo "Version correctly bumped: $MAIN_VERSION → $PR_VERSION"
 
       - name: Analyze results
+        if: always() && steps.install.outcome == 'success'
         run: |
           echo "Lint result: ${{ steps.lint.outcome }}"
           echo "Snyk result: ${{ steps.snyk.outcome }}"
           echo "TruffleHog result: ${{ steps.trufflehog.outcome }}"
           echo "Test result: ${{ steps.test.outcome }}"
+          echo "Version check result: ${{ steps.version-check.outcome }}"
           if [[ "${{ steps.lint.outcome }}" == "failure" \
                 || "${{ steps.snyk.outcome }}" == "failure" \
                 || "${{ steps.trufflehog.outcome }}" == "failure" \

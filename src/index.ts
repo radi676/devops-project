@@ -14,8 +14,7 @@ const server = http.createServer((req, res) => {
 							: 'development',
 			time: new Date().toISOString(),
 			utc_time: new Date().toUTCString(),
-			my_property: 'My value',
-			
+			my_property: 'My value'
 		})
 	)
 })

@@ -52,6 +52,8 @@ export default defineConfig([globalIgnores(["**/*.test.ts", "**/*.spec.ts"]), {
         curly: "error",
         "no-unused-vars": "off",
 
+        "no-multiple-empty-lines": ["error", { max: 1, maxEOF: 0, maxBOF: 0 }],
+
         "@typescript-eslint/no-unused-vars": ["error", {
             argsIgnorePattern: "^_",
             ignoreRestSiblings: true,
