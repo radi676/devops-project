@@ -92,6 +92,10 @@ jobs:
     needs: [build-and-push, trivy-scan]
     runs-on: ubuntu-latest
     if: needs.build-and-push.outputs.build == 'true'
+    environment: main
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Authenticate to GCP
         id: gcpauth
