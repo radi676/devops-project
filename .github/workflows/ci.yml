@@ -55,7 +55,7 @@ jobs:
         id: version-check
         continue-on-error: true
         run: |
-          VERSION=$(jq -r '.version' package.json)
+          PR_VERSION=$(jq -r '.version' package.json)
           echo "PR_VERSION=$VERSION"
 
           git fetch origin main
