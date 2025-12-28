@@ -17,8 +17,8 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     outputs:
-      image: ${{ steps.meta.outputs.image }}
       build: ${{ steps.check-image.outputs.build }}
+      version: ${{ steps.pkg.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,20 +59,17 @@ jobs:
       - name: Build and push image to GCR
         if: steps.check-image.outputs.build == 'true'
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          docker build -t $IMAGE_NAME:$IMAGE_TAG .
-          docker push $IMAGE_NAME:$IMAGE_TAG
-
-      - name: Set output image
-        id: meta
-        run: echo "image=$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_OUTPUT
+          IMAGE_TAG=${{ steps.pkg.outputs.version }}
+          IMAGE=${{ env.IMAGE_NAME }}
+          docker build -t $IMAGE:$IMAGE_TAG .
+          docker push $IMAGE:$IMAGE_TAG
 
   trivy-scan:
     needs: build-and-push
     if: needs.build-and-push.outputs.build == 'true'
     uses: ./.github/workflows/trivy-scan.yml
     with:
-      image: $IMAGE_NAME:${{ github.sha }}
+      image: ${{ env.IMAGE_NAME }}:${{ github.sha }}
       build: false
 
   publish-image:
@@ -103,8 +100,10 @@ jobs:
       - name: "Publish Image"
         run: |
           IMAGE_TAG=${{ needs.build-and-push.outputs.version }}
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:$IMAGE_TAG
-          docker tag $IMAGE_NAME:${{ github.sha }} $IMAGE_NAME:latest
+          IMAGE_SHA=${{ github.sha }}
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
+          docker tag $IMAGE_NAME:$IMAGE_SHA $IMAGE_NAME:$IMAGE_TAG
+          docker tag $IMAGE_NAME:$IMAGE_SHA $IMAGE_NAME:latest
           docker push $IMAGE_NAME:$IMAGE_TAG
 
   deploy:
@@ -135,7 +134,9 @@ jobs:
 
       - name: Deploy to cluster
         run: |
-          export IMAGE=${{ needs.build-and-push.outputs.image }}
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
+          IMAGE_TAG=${{ needs.publish-image.outputs.version }}
+          export IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
           export REPLICAS=1
           export DEPLOYMENT=devops-deployment
           export APP=devops-app
