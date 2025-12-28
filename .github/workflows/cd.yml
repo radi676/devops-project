@@ -122,8 +122,12 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    needs: publish-image
-    if: github.ref == 'refs/heads/main'
+    needs: ["build-and-push", "publish-image"]
+    if: always() && github.ref == 'refs/heads/main' &&
+      (
+      needs.build-and-push.outputs.build == 'false' ||
+      needs.publish-image.result == 'success'
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
