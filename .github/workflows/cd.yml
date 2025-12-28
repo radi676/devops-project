@@ -69,14 +69,11 @@ jobs:
 
   trivy-scan:
     needs: build-and-push
-    runs-on: ubuntu-latest
     if: needs.build-and-push.outputs.build == 'true'
-    steps:
-      - name: Trivy Scan
-        uses: ./.github/workflows/trivy-scan.yml
-        with:
-          image: $IMAGE_NAME:${{ github.sha }}
-          build: false
+    uses: ./.github/workflows/trivy-scan.yml
+    with:
+      image: $IMAGE_NAME:${{ github.sha }}
+      build: false
 
   publish-image:
     needs: [build-and-push, trivy-scan]
