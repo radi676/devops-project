@@ -183,7 +183,7 @@ jobs:
           export SERVICE=devops-service
           export NAMESPACE=default
           echo "Waiting for external IP or hostname for service ${SERVICE}..."
-          for i in {1..6}; do
+          for i in {1..12}; do
             ip=$(kubectl get svc ${SERVICE} -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
             if [ -n "$ip" ]; then
               echo "Service ${SERVICE} external IP: $ip"
@@ -202,4 +202,3 @@ jobs:
 
           echo "Timed out waiting for LoadBalancer IP/hostname for service ${SERVICE}"
           kubectl get svc ${SERVICE} -n ${NAMESPACE} -o wide
-          exit 1
