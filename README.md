@@ -50,3 +50,9 @@ There are two workflows:
   - Go to `infra/terraform` and run `terrafrom init`
   - Create `terraform.tfvars` file with the desired values by using `terraform.tfvars.example` as an example - only the project id is mandatory as other variables have default values
   - Execute `terraform plan -out plan-tf` to create the plan and `terraform apply plan-tf` to provision the resource in GCP
+
+### Future improvements
+
+- CI: E2E tests that run against a temporary containerized environment.
+- CD: Automatic rollback if health checks fails after deployment, use Canary deployments (gradualy rollout the new deployment), use multiple environments - staging for validation with an image promoted to production.
+- IaC:  Use remote state storage (e.g., Google Cloud Storage) with locking to enable team collaboration and create a provisioning pipeline, use namespaces for different environments, automate network setup and GCP resources in general.
